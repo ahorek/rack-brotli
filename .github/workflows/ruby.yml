@@ -19,7 +19,6 @@ jobs:
           - { ruby: 2.5, c-o-e: false }
           - { ruby: 2.7, c-o-e: false }
           - { ruby: 3.0, c-o-e: false }
-          - { ruby: jruby-9.2.16.0, c-o-e: false }
     steps:
     - uses: actions/checkout@v2
     - name: Set up Ruby
