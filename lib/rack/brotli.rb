@@ -1,5 +1,7 @@
+require_relative 'brotli/instrument'
 require_relative 'brotli/deflater'
 require_relative 'brotli/version'
+require_relative 'brotli/railtie' if defined?(::Rails)
 
 module Rack
   module Brotli

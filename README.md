@@ -8,7 +8,7 @@ Brotli generally compresses better than `gzip` for the same CPU cost and is supp
 
 Install gem:
 
-    gem install rack-brotli
+    gem install rack-easy_brotli
 
 Requiring `'rack/brotli'` will autoload `Rack::Brotli` module. The following example shows what a simple rackup
 (`config.ru`) file might look like:
@@ -20,6 +20,11 @@ require 'rack/brotli'
 use Rack::Brotli
 
 run theapp
+```
+
+bundler
+```ruby
+gem 'rack-easy_brotli'
 ```
 
 ### Testing

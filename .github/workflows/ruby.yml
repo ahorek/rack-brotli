@@ -1,0 +1,32 @@
+name: Ruby
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: >-
+      ${{ matrix.ruby }} / ${{ matrix.gemfile }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { ruby: 2.5, c-o-e: false }
+          - { ruby: 2.7, c-o-e: false }
+          - { ruby: 3.0, c-o-e: false }
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Ruby
+      uses: ruby/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby }}
+    - name: Install dependencies
+      run: bundle install
+    - name: Run tests
+      run: bundle exec rake test
+      continue-on-error: ${{ matrix.c-o-e || false }}
