@@ -29,11 +29,6 @@ module Rack::Brotli
 
       @condition = options[:if]
       @compressible_types = options[:include]
-      if defined?(ActiveSupport::Notifications)
-        @notifier = ActiveSupport::Notifications
-      else
-        @notifier = Rack::Brotli::Instrument
-      end
       @deflater_options = { quality: 5 }
       @deflater_options.merge!(options[:deflater]) if options[:deflater]
       @deflater_options
@@ -54,23 +49,21 @@ module Rack::Brotli
 
       return [status, headers, body] unless encoding
 
-      instrument(request) do
-        # Set the Vary HTTP header.
-        vary = headers["Vary"].to_s.split(",").map(&:strip)
-        unless vary.include?("*") || vary.include?("Accept-Encoding")
-          headers["Vary"] = vary.push("Accept-Encoding").join(",")
-        end
+      # Set the Vary HTTP header.
+      vary = headers["Vary"].to_s.split(",").map(&:strip)
+      unless vary.include?("*") || vary.include?("Accept-Encoding")
+        headers["Vary"] = vary.push("Accept-Encoding").join(",")
+      end
 
-        case encoding
-        when "br"
-          headers['Content-Encoding'] = "br"
-          headers.delete('Content-Length')
-          [status, headers, BrotliStream.new(body, @deflater_options)]
-        when nil
-          message = "An acceptable encoding for the requested resource #{request.fullpath} could not be found."
-          bp = Rack::BodyProxy.new([message]) { body.close if body.respond_to?(:close) }
-          [406, {'Content-Type' => "text/plain", 'Content-Length' => message.length.to_s}, bp]
-        end
+      case encoding
+      when "br"
+        headers['Content-Encoding'] = "br"
+        headers.delete('Content-Length')
+        [status, headers, BrotliStream.new(body, @deflater_options)]
+      when nil
+        message = "An acceptable encoding for the requested resource #{request.fullpath} could not be found."
+        bp = Rack::BodyProxy.new([message]) { body.close if body.respond_to?(:close) }
+        [406, {'Content-Type' => "text/plain", 'Content-Length' => message.length.to_s}, bp]
       end
     end
 
@@ -100,16 +93,9 @@ module Rack::Brotli
     
     private
 
-    # instrument for performance metrics
-    def instrument(request, &block)
-      @notifier.instrument("rack.brotli", request: request) do
-        yield
-      end
-    end
-
     def header_hash(headers)
       if headers.is_a?(Rack::Utils::HeaderHash)
-        header
+        headers
       else
         Rack::Utils::HeaderHash.new(headers) # rack < 2.2
       end
