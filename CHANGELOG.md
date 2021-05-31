@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 1.2.0
+- easy fork & rename
+- frozen string literals
+- reduce allocations
+- add AS instrumentation
+- better integration with Rails
+
 ## 1.1.0
 ## Changed
 - Removed dependency on `git-version-bump` gem for versioning. `rack-brotli` now only depends on `rack` and `brotli`.

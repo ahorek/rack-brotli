@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "brotli"
 require 'rack/utils'
 
@@ -27,12 +29,19 @@ module Rack::Brotli
 
       @condition = options[:if]
       @compressible_types = options[:include]
-      @deflater_options = { quality: 5 }.merge(options[:deflater] || {})
+      if defined?(ActiveSupport::Notifications)
+        @notifier = ActiveSupport::Notifications
+      else
+        @notifier = Rack::Brotli::Instrument
+      end
+      @deflater_options = { quality: 5 }
+      @deflater_options.merge!(options[:deflater]) if options[:deflater]
+      @deflater_options
     end
 
     def call(env)
       status, headers, body = @app.call(env)
-      headers = Rack::Utils::HeaderHash.new(headers)
+      headers = header_hash(headers)
 
       unless should_deflate?(env, status, headers, body)
         return [status, headers, body]
@@ -45,21 +54,23 @@ module Rack::Brotli
 
       return [status, headers, body] unless encoding
 
-      # Set the Vary HTTP header.
-      vary = headers["Vary"].to_s.split(",").map(&:strip)
-      unless vary.include?("*") || vary.include?("Accept-Encoding")
-        headers["Vary"] = vary.push("Accept-Encoding").join(",")
-      end
+      instrument(request) do
+        # Set the Vary HTTP header.
+        vary = headers["Vary"].to_s.split(",").map(&:strip)
+        unless vary.include?("*") || vary.include?("Accept-Encoding")
+          headers["Vary"] = vary.push("Accept-Encoding").join(",")
+        end
 
-      case encoding
-      when "br"
-        headers['Content-Encoding'] = "br"
-        headers.delete(Rack::CONTENT_LENGTH)
-        [status, headers, BrotliStream.new(body, @deflater_options)]
-      when nil
-        message = "An acceptable encoding for the requested resource #{request.fullpath} could not be found."
-        bp = Rack::BodyProxy.new([message]) { body.close if body.respond_to?(:close) }
-        [406, {Rack::CONTENT_TYPE => "text/plain", Rack::CONTENT_LENGTH => message.length.to_s}, bp]
+        case encoding
+        when "br"
+          headers['Content-Encoding'] = "br"
+          headers.delete('Content-Length')
+          [status, headers, BrotliStream.new(body, @deflater_options)]
+        when nil
+          message = "An acceptable encoding for the requested resource #{request.fullpath} could not be found."
+          bp = Rack::BodyProxy.new([message]) { body.close if body.respond_to?(:close) }
+          [406, {'Content-Type' => "text/plain", 'Content-Length' => message.length.to_s}, bp]
+        end
       end
     end
 
@@ -73,7 +84,7 @@ module Rack::Brotli
 
       def each(&block)
         @writer = block
-        buffer = ''
+        buffer = +''
         @body.each { |part|
           buffer << part
         }
@@ -89,20 +100,39 @@ module Rack::Brotli
     
     private
 
+    # instrument for performance metrics
+    def instrument(request, &block)
+      @notifier.instrument("rack.brotli", request: request) do
+        yield
+      end
+    end
+
+    def header_hash(headers)
+      if headers.is_a?(Rack::Utils::HeaderHash)
+        header
+      else
+        Rack::Utils::HeaderHash.new(headers) # rack < 2.2
+      end
+    end
+
     def should_deflate?(env, status, headers, body)
       # Skip compressing empty entity body responses and responses with
       # no-transform set.
-      if Rack::Utils::STATUS_WITH_NO_ENTITY_BODY.include?(status) ||
-          headers[Rack::CACHE_CONTROL].to_s =~ /\bno-transform\b/ ||
-         (headers['Content-Encoding'] && headers['Content-Encoding'] !~ /\bidentity\b/)
+      if Rack::Utils::STATUS_WITH_NO_ENTITY_BODY.key?(status.to_i) ||
+          /\bno-transform\b/.match?(headers['Cache-Control'].to_s) ||
+          headers['Content-Encoding']&.!~(/\bidentity\b/)
         return false
       end
 
       # Skip if @compressible_types are given and does not include request's content type
-      return false if @compressible_types && !(headers.has_key?(Rack::CONTENT_TYPE) && @compressible_types.include?(headers[Rack::CONTENT_TYPE][/[^;]*/]))
+      return false if @compressible_types && !(headers.has_key?('Content-Type') && @compressible_types.include?(headers['Content-Type'][/[^;]*/]))
 
       # Skip if @condition lambda is given and evaluates to false
       return false if @condition && !@condition.call(env, status, headers, body)
+
+      # No point in compressing empty body, also handles usage with
+      # Rack::Sendfile.
+      return false if headers['Content-Length'] == '0'
 
       true
     end

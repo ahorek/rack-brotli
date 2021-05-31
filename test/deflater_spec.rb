@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require 'minitest/autorun'
 require 'stringio'
 require 'rack/brotli'
@@ -51,24 +53,24 @@ describe Rack::Brotli do
     )
 
     # verify status
-    status.must_equal expected_status
+    _(status).must_equal expected_status
 
     # verify body
     unless options['skip_body_verify']
-      body_text = ''
+      body_text = +''
       body.each { |part| body_text << part }
 
       deflated_body = case expected_encoding
                         when 'br'
                           io = StringIO.new(body_text)
                           string_body = io.string
-                          string_body.size.must_equal response_size if response_size
+                          _(string_body.size).must_equal response_size if response_size
                           Brotli.inflate(string_body)
                         else
                           body_text
                       end
 
-      deflated_body.must_equal expected_body
+      _(deflated_body).must_equal expected_body
     end
 
     # yield full response verification
@@ -88,7 +90,7 @@ describe Rack::Brotli do
     class << app_body; def each; yield('foo'); yield('bar'); end; end
 
     verify(200, 'foobar', br_encoding, { 'app_body' => app_body }) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Encoding' => 'br',
                            'Vary' => 'Accept-Encoding',
                            'Content-Type' => 'text/plain'
@@ -102,7 +104,7 @@ describe Rack::Brotli do
       class << app_body; def each; yield('foo'); yield('bar'); end; end
 
       verify(200, app_body, br_encoding, { 'skip_body_verify' => true }) do |status, headers, body|
-        headers.must_equal({
+        _(headers).must_equal({
                              'Content-Encoding' => 'br',
                              'Vary' => 'Accept-Encoding',
                              'Content-Type' => 'text/plain'
@@ -113,7 +115,7 @@ describe Rack::Brotli do
         body.each { |part| buf << inflater.inflate(part) }
         buf << inflater.finish
 
-        buf.delete_if { |part| part.empty? }.join.must_equal 'foobar'
+        _(buf.delete_if { |part| part.empty? }.join).must_equal 'foobar'
       end
     end
   end
@@ -123,7 +125,7 @@ describe Rack::Brotli do
     class << app_body; def each; yield('foo'); yield('bar'); end; end
     opts = { 'skip_body_verify' => true }
     verify(200, app_body, 'br', opts) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Encoding' => 'br',
                            'Vary' => 'Accept-Encoding',
                            'Content-Type' => 'text/plain'
@@ -140,14 +142,14 @@ describe Rack::Brotli do
         end
       end
       #inflater.finish
-      buf.must_equal(%w(foobar))
+      _(buf).must_equal(%w(foobar))
     end
   end
 
   # TODO: This is really just a special case of the above...
   it 'be able to deflate String bodies' do
     verify(200, 'Hello world!', br_encoding) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Encoding' => 'br',
                            'Vary' => 'Accept-Encoding',
                            'Content-Type' => 'text/plain'
@@ -160,7 +162,7 @@ describe Rack::Brotli do
     class << app_body; def each; yield('foo'); yield('bar'); end; end
 
     verify(200, 'foobar', 'br', { 'app_body' => app_body }) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Encoding' => 'br',
                            'Vary' => 'Accept-Encoding',
                            'Content-Type' => 'text/plain'
@@ -174,7 +176,7 @@ describe Rack::Brotli do
       class << app_body; def each; yield('foo'); yield('bar'); end; end
 
       verify(200, app_body, 'br', { 'skip_body_verify' => true }) do |status, headers, body|
-        headers.must_equal({
+        _(headers).must_equal({
                              'Content-Encoding' => 'br',
                              'Vary' => 'Accept-Encoding',
                              'Content-Type' => 'text/plain'
@@ -185,14 +187,14 @@ describe Rack::Brotli do
         body.each { |part| buf << inflater.inflate(part) }
         buf << inflater.finish
 
-        buf.delete_if { |part| part.empty? }.join.must_equal 'foobar'
+        _(buf.delete_if { |part| part.empty? }.join).must_equal 'foobar'
       end
     end
   end
 
   it 'be able to fallback to no deflation' do
     verify(200, 'Hello world!', 'superzip') do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Type' => 'text/plain'
                          })
     end
@@ -200,7 +202,7 @@ describe Rack::Brotli do
 
   it 'be able to skip when there is no response entity body' do
     verify(304, '', { 'br' => nil }, { 'app_body' => [] }) do |status, headers, body|
-      headers.must_equal({})
+      _(headers).must_equal({})
     end
   end
 
@@ -224,13 +226,13 @@ describe Rack::Brotli do
     }
 
     verify(200, not_found_body1, 'identity;q=0', options1) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Type' => 'text/plain'
                          })
     end
 
     verify(200, not_found_body2, 'identity;q=0', options2) do |status, headers, body|
-      headers.must_equal({
+      _(headers).must_equal({
                            'Content-Type' => 'text/plain'
                          })
     end
@@ -244,7 +246,7 @@ describe Rack::Brotli do
       }
     }
     verify(200, 'Hello World!', { 'br' => nil }, options) do |status, headers, body|
-      headers.wont_include 'Content-Encoding'
+      _(headers).wont_include 'Content-Encoding'
     end
   end
 
